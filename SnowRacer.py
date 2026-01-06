@@ -24,7 +24,18 @@ class Racer(arcade.Sprite):
 
     def update(self, boost, delta_time, keys_pressed, **kwargs):
         if kwargs:
-            self.speed_x = kwargs['speed']
+            if type(kwargs['speed']) == type(0):
+                self.speed_x = kwargs['speed']
+            elif kwargs['speed'][0] == '/':
+                self.speed_x /= float(kwargs['speed'][1:])
+            elif kwargs['speed'][0] == '-':
+                self.speed_x -= float(kwargs['speed'][1:])
+            elif kwargs['speed'][0] == '*':
+                self.speed_x *= float(kwargs['speed'][1:])
+            elif kwargs['speed'][0] == '+':
+                self.speed_x += float(kwargs['speed'][1:])
+        if self.speed_x < 0:
+            self.speed_x = 0
         dx, dy = 0, 0
         if arcade.key.LEFT in keys_pressed or arcade.key.A in keys_pressed:
             dx -= self.speed_y * delta_time
@@ -86,8 +97,11 @@ class SnowRacerGame(arcade.Window):
         boost = 0.25
 
         collision_with_barriers = arcade.check_for_collision_with_list(self.racer, self.barriers)
+        collision_with_nets = arcade.check_for_collision_with_list(self.racer, self.nets)
         if collision_with_barriers:
             self.racer_list.update(0, delta_time, self.keys_pressed, speed=0)
+        elif collision_with_nets:
+            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'-{boost * 10}')
         else:
             self.racer_list.update(boost, delta_time, self.keys_pressed)
 
