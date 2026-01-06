@@ -98,10 +98,13 @@ class SnowRacerGame(arcade.Window):
 
         collision_with_barriers = arcade.check_for_collision_with_list(self.racer, self.barriers)
         collision_with_nets = arcade.check_for_collision_with_list(self.racer, self.nets)
+        collision_with_tramplins = arcade.check_for_collision_with_list(self.racer, self.tramplins)
         if collision_with_barriers:
             self.racer_list.update(0, delta_time, self.keys_pressed, speed=0)
         elif collision_with_nets:
             self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'-{boost * 10}')
+        elif collision_with_tramplins:
+            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'+{boost * 10}')
         else:
             self.racer_list.update(boost, delta_time, self.keys_pressed)
 
