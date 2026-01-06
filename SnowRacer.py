@@ -8,7 +8,6 @@ SCREEN_TITLE = 'Snow Racer'
 RACER_SPEED = 100
 CAMERA_LERP = 1
 DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
-DEAD_ZONE_H = int(SCREEN_HEIGHT * 0.1)
 
 class Racer(arcade.Sprite):
     def __init__(self,position_x, position_y):
@@ -37,6 +36,8 @@ class Racer(arcade.Sprite):
 
         self.center_x += dx
         self.center_y += dy
+        if self.center_y < SCALE * TILE_WIDTH * 15:
+            self.center_y += SCALE * TILE_WIDTH * 144
         self.speed_x += boost
 
 class SnowRacerGame(arcade.Window):
@@ -82,7 +83,7 @@ class SnowRacerGame(arcade.Window):
             self.keys_pressed.remove(key)
 
     def on_update(self, delta_time):
-        boost = 1
+        boost = 0.25
 
         collision_with_barriers = arcade.check_for_collision_with_list(self.racer, self.barriers)
         if collision_with_barriers:
@@ -95,8 +96,6 @@ class SnowRacerGame(arcade.Window):
         cam_x, cam_y = self.world_camera.position
         dz_left = cam_x - DEAD_ZONE_W // 2
         dz_right = cam_x + DEAD_ZONE_W // 2
-        dz_bottom = cam_y - DEAD_ZONE_H // 2
-        dz_top = cam_y + DEAD_ZONE_H // 2
 
         px, py = self.racer.center_x, self.racer.center_y
         target_x, target_y = cam_x, cam_y
@@ -105,10 +104,10 @@ class SnowRacerGame(arcade.Window):
             target_x = px + DEAD_ZONE_W // 2
         elif px > dz_right:
             target_x = px - DEAD_ZONE_W // 2
-        if py < dz_bottom:
-            target_y = py + DEAD_ZONE_H // 2
-        elif py > dz_top:
-            target_y = py - DEAD_ZONE_H // 2
+        if py < cam_y:
+            target_y = py
+        elif py > cam_y:
+            target_y = py
 
         half_w = self.world_camera.viewport_width / 2
         half_h = self.world_camera.viewport_height / 2
