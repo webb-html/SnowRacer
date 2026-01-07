@@ -8,17 +8,19 @@ SCREEN_WIDTH = 16 * TILE_WIDTH * SCALE
 SCREEN_HEIGHT = 20 * TILE_WIDTH * SCALE
 SCREEN_TITLE = 'Snow Racer'
 
-RACER_SPEED = 100
+RACER_SPEED = 50
+
+MONSTER_SPEED = 100
 
 CAMERA_LERP = 1
 CAMERA_DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
 
 class Racer(arcade.Sprite):
-    def __init__(self,position_x, position_y):
+    def __init__(self, position_x, position_y):
         super().__init__()
         self.scale = SCALE
-        self.speed_x = RACER_SPEED
-        self.speed_y = 200
+        self.speed_y = RACER_SPEED
+        self.speed_x = 200
 
         self.slow_texture = arcade.load_texture("images/character/character_slow.png")
         self.texture = self.slow_texture
@@ -26,34 +28,62 @@ class Racer(arcade.Sprite):
         self.center_x = position_x
         self.center_y = position_y
 
-    def update(self, boost, delta_time, keys_pressed, **kwargs):
+    def update(self,delta_time, boost, keys_pressed, **kwargs):
         if kwargs:
             if type(kwargs['speed']) == type(0):
-                self.speed_x = kwargs['speed']
+                self.speed_y = kwargs['speed']
             elif kwargs['speed'][0] == '/':
-                self.speed_x /= float(kwargs['speed'][1:])
+                self.speed_y /= float(kwargs['speed'][1:])
             elif kwargs['speed'][0] == '-':
-                self.speed_x -= float(kwargs['speed'][1:])
+                self.speed_y -= float(kwargs['speed'][1:])
             elif kwargs['speed'][0] == '*':
-                self.speed_x *= float(kwargs['speed'][1:])
+                self.speed_y *= float(kwargs['speed'][1:])
             elif kwargs['speed'][0] == '+':
-                self.speed_x += float(kwargs['speed'][1:])
-        if self.speed_x < 0:
-            self.speed_x = 0
+                self.speed_y += float(kwargs['speed'][1:])
+        if self.speed_y < 0:
+            self.speed_y = 0
         dx, dy = 0, 0
         if arcade.key.LEFT in keys_pressed or arcade.key.A in keys_pressed:
-            dx -= self.speed_y * delta_time
+            dx -= self.speed_x * delta_time
         if arcade.key.RIGHT in keys_pressed or arcade.key.D in keys_pressed:
-            dx += self.speed_y * delta_time
+            dx += self.speed_x * delta_time
         if arcade.key.UP in keys_pressed or arcade.key.W in keys_pressed:
             pass
-        dy -= self.speed_x * delta_time
+        dy -= self.speed_y * delta_time
 
         self.center_x += dx
         self.center_y += dy
-        if self.center_y < SCALE * TILE_WIDTH * 15:
-            teleport_sprites(self)
-        self.speed_x += boost
+        self.speed_y += boost
+
+
+class Monster(arcade.Sprite):
+    def __init__(self,position_x, position_y, prey):
+        super().__init__()
+        self.scale = SCALE
+        self.speed = MONSTER_SPEED
+
+        self.run_textures = []
+        self.run_textures.append(arcade.load_texture("images/monster/monster_run_1.png"))
+        self.run_textures.append(arcade.load_texture("images/monster/monster_run_2.png"))
+        self.texture = self.run_textures[0]
+
+        self.center_x = position_x
+        self.center_y = position_y
+
+        self.prey = prey
+
+    def update(self, delta_time):
+        dx, dy = 0, 0
+        if self.prey.center_x - self.center_x < 0.3 * TILE_WIDTH * SCALE:
+            dx -= self.speed * delta_time
+        if self.prey.center_x - self.center_x > -0.3 * TILE_WIDTH * SCALE:
+            dx += self.speed * delta_time
+        if self.prey.center_y - self.center_y < -1 * TILE_WIDTH * SCALE:
+            dy -= self.speed * delta_time
+
+        self.center_x += dx
+        self.center_y += dy
+
 
 class SnowRacerGame(arcade.Window):
     def __init__(self):
@@ -65,8 +95,10 @@ class SnowRacerGame(arcade.Window):
         self.tile_map = None
 
         self.racer_list = arcade.SpriteList()
-
         self.racer: arcade.Sprite | None = None
+
+        self.monster_list = arcade.SpriteList()
+        self.monster: arcade.Sprite | None = None
 
     def setup(self):
 
@@ -82,8 +114,11 @@ class SnowRacerGame(arcade.Window):
         self.world_width = int(self.tile_map.width * self.tile_map.tile_width * SCALE)
         self.world_height = int(self.tile_map.height * self.tile_map.tile_height * SCALE)
 
-        self.racer = Racer(SCALE * TILE_WIDTH * 24, SCALE * TILE_WIDTH * 159)
+        self.racer = Racer(SCALE * TILE_WIDTH * 25, SCALE * TILE_WIDTH * 158)
         self.racer_list.append(self.racer)
+
+        self.monster = Monster(SCALE * TILE_WIDTH * 25, SCALE * TILE_WIDTH * 169, self.racer)
+        self.monster_list.append(self.monster)
 
         self.keys_pressed = set()
 
@@ -100,17 +135,21 @@ class SnowRacerGame(arcade.Window):
     def on_update(self, delta_time):
         boost = 1
 
+        if self.racer.center_y < SCALE * TILE_WIDTH * 15:
+            teleport_sprites(self.racer, self.monster)
+
         collision_with_barriers = arcade.check_for_collision_with_list(self.racer, self.barriers)
         collision_with_nets = arcade.check_for_collision_with_list(self.racer, self.nets)
         collision_with_tramplins = arcade.check_for_collision_with_list(self.racer, self.tramplins)
         if collision_with_tramplins:
-            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'+{boost * 5}')
+            self.racer_list.update(delta_time, boost, self.keys_pressed, speed=f'+{boost * 5}')
         elif collision_with_nets:
-            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'-{boost * 5}')
+            self.racer_list.update(delta_time, boost, self.keys_pressed, speed=f'-{boost * 5}')
         elif collision_with_barriers:
-            self.racer_list.update(0, delta_time, self.keys_pressed, speed=f'/1.5')
+            self.racer_list.update(delta_time, 0, self.keys_pressed, speed=f'/1.5')
         else:
-            self.racer_list.update(boost, delta_time, self.keys_pressed)
+            self.racer_list.update(delta_time, boost, self.keys_pressed)
+        self.monster.update(delta_time)
 
         self.physics_engine.update()
 
@@ -150,6 +189,7 @@ class SnowRacerGame(arcade.Window):
         self.shadow_list.draw()
         self.tramplins.draw()
         self.nets.draw()
+        self.monster_list.draw()
         self.racer_list.draw()
         self.nature_list.draw()
         self.barriers.draw()
