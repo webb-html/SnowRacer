@@ -1,13 +1,17 @@
 import arcade
 
 SCALE = 1.5
+
 TILE_WIDTH = 16
+
 SCREEN_WIDTH = 16 * TILE_WIDTH * SCALE
 SCREEN_HEIGHT = 20 * TILE_WIDTH * SCALE
 SCREEN_TITLE = 'Snow Racer'
+
 RACER_SPEED = 100
+
 CAMERA_LERP = 1
-DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
+CAMERA_DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
 
 class Racer(arcade.Sprite):
     def __init__(self,position_x, position_y):
@@ -48,7 +52,7 @@ class Racer(arcade.Sprite):
         self.center_x += dx
         self.center_y += dy
         if self.center_y < SCALE * TILE_WIDTH * 15:
-            self.center_y += SCALE * TILE_WIDTH * 144
+            teleport_sprites(self)
         self.speed_x += boost
 
 class SnowRacerGame(arcade.Window):
@@ -94,33 +98,33 @@ class SnowRacerGame(arcade.Window):
             self.keys_pressed.remove(key)
 
     def on_update(self, delta_time):
-        boost = 0.25
+        boost = 1
 
         collision_with_barriers = arcade.check_for_collision_with_list(self.racer, self.barriers)
         collision_with_nets = arcade.check_for_collision_with_list(self.racer, self.nets)
         collision_with_tramplins = arcade.check_for_collision_with_list(self.racer, self.tramplins)
-        if collision_with_barriers:
-            self.racer_list.update(0, delta_time, self.keys_pressed, speed=0)
+        if collision_with_tramplins:
+            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'+{boost * 5}')
         elif collision_with_nets:
-            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'-{boost * 10}')
-        elif collision_with_tramplins:
-            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'+{boost * 10}')
+            self.racer_list.update(boost, delta_time, self.keys_pressed, speed=f'-{boost * 5}')
+        elif collision_with_barriers:
+            self.racer_list.update(0, delta_time, self.keys_pressed, speed=f'/1.5')
         else:
             self.racer_list.update(boost, delta_time, self.keys_pressed)
 
         self.physics_engine.update()
 
         cam_x, cam_y = self.world_camera.position
-        dz_left = cam_x - DEAD_ZONE_W // 2
-        dz_right = cam_x + DEAD_ZONE_W // 2
+        dz_left = cam_x - CAMERA_DEAD_ZONE_W // 2
+        dz_right = cam_x + CAMERA_DEAD_ZONE_W // 2
 
         px, py = self.racer.center_x, self.racer.center_y
         target_x, target_y = cam_x, cam_y
 
         if px < dz_left:
-            target_x = px + DEAD_ZONE_W // 2
+            target_x = px + CAMERA_DEAD_ZONE_W // 2
         elif px > dz_right:
-            target_x = px - DEAD_ZONE_W // 2
+            target_x = px - CAMERA_DEAD_ZONE_W // 2
         if py < cam_y:
             target_y = py
         elif py > cam_y:
@@ -153,6 +157,10 @@ class SnowRacerGame(arcade.Window):
         #self.collision_list.draw()
 
         self.gui_camera.use()
+
+def teleport_sprites(*args):
+    for sprite in args:
+        sprite.center_y += SCALE * TILE_WIDTH * 144
 
 def main():
     game = SnowRacerGame()
