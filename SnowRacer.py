@@ -23,6 +23,7 @@ class Racer(arcade.Sprite):
         self.speed_x = 200
 
         self.slow_texture = arcade.load_texture("images/character/character_slow.png")
+        self.fast_texture = arcade.load_texture('images/character/character_fast.png')
         self.texture = self.slow_texture
 
         self.center_x = position_x
@@ -55,6 +56,12 @@ class Racer(arcade.Sprite):
         self.center_y += dy
         self.speed_y += boost
 
+    def update_texture(self):
+        if self.speed_y > 200:
+            self.texture = self.fast_texture
+        else:
+            self.texture = self.slow_texture
+
 
 class Monster(arcade.Sprite):
     def __init__(self,position_x, position_y, prey):
@@ -65,12 +72,18 @@ class Monster(arcade.Sprite):
         self.run_textures = []
         self.run_textures.append(arcade.load_texture("images/monster/monster_run_1.png"))
         self.run_textures.append(arcade.load_texture("images/monster/monster_run_2.png"))
+        self.attack_texture = arcade.load_texture('images/monster/monster_attack.png')
         self.texture = self.run_textures[0]
 
         self.center_x = position_x
         self.center_y = position_y
 
         self.prey = prey
+
+        self.current_texture = 0
+        self.texture_change_time = 0
+        self.texture_change_delay = 0.09
+        self.is_running = False
 
     def update(self, delta_time):
         dx, dy = 0, 0
@@ -81,10 +94,27 @@ class Monster(arcade.Sprite):
         if self.prey.center_y - self.center_y < -1 * TILE_WIDTH * SCALE:
             dy -= self.speed * delta_time
 
+        if dy != 0 or dx != 0:
+            self.is_running = True
+        else:
+            self.is_running = False
+
         self.center_x += dx
         self.center_y += dy
 
         self.center_y = min(self.center_y, self.prey.center_y + TILE_WIDTH * SCALE * 8)
+
+    def update_animation(self, delta_time: float = 1/60):
+        if self.is_running:
+            self.texture_change_time += delta_time
+            if self.texture_change_time >= self.texture_change_delay:
+                self.texture_change_time = 0
+                self.current_texture += 1
+                if self.current_texture >= len(self.run_textures):
+                    self.current_texture = 0
+                self.texture = self.run_textures[self.current_texture]
+        else:
+            self.texture = self.attack_texture
 
 
 class SnowRacerGame(arcade.Window):
@@ -153,7 +183,10 @@ class SnowRacerGame(arcade.Window):
         else:
             self.racer_list.update(delta_time, boost, self.keys_pressed)
 
+        self.racer.update_texture()
+
         self.monster.update(delta_time)
+        self.monster.update_animation()
 
         collision_with_monster = arcade.check_for_collision(self.racer, self.monster)
         if collision_with_monster:
