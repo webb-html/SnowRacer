@@ -1,4 +1,6 @@
 import arcade
+from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle
+from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 
 SCALE = 1.5
 
@@ -82,7 +84,7 @@ class Monster(arcade.Sprite):
 
         self.current_texture = 0
         self.texture_change_time = 0
-        self.texture_change_delay = 0.09
+        self.texture_change_delay = 0.1
         self.is_running = False
 
     def update(self, delta_time):
@@ -117,9 +119,9 @@ class Monster(arcade.Sprite):
             self.texture = self.attack_texture
 
 
-class SnowRacerGame(arcade.Window):
+class SnowRacerGame(arcade.View):
     def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, antialiasing=True)
+        super().__init__()
 
         self.world_camera = arcade.camera.Camera2D()  # Камера для игрового мира
         self.gui_camera = arcade.camera.Camera2D()
@@ -236,19 +238,59 @@ class SnowRacerGame(arcade.Window):
         self.racer_list.draw()
         self.lap_list.draw()
 
-        #self.collision_list.draw()
-
         self.gui_camera.use()
+
+class StartWindow(arcade.View):
+    def __init__(self):
+        super().__init__()
+        arcade.set_background_color((183,210,235, 255))
+
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+        self.box_layout = UIBoxLayout(vertical=True, space_between=10)
+
+        self.setup_widgets()
+
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
+
+    def setup_widgets(self):
+        name_of_game = UILabel('Snow Racer', text_color=arcade.color.WHITE,
+                       font_name='Karmatic Arcade', font_size=30)
+        self.box_layout.add(name_of_game)
+
+        button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'press': UITextureButtonStyle(font_size=12, font_name=('Karmatic Arcade', 'arial', 'calibri'),
+                                                      font_color=(200, 200, 200, 255))}
+
+        start_button = UIFlatButton(text='Start game', font_name='Karmatic Arcade',
+                                        width=200, height=50, style=button_style)
+        start_button.on_click = self.start_game
+        self.box_layout.add(start_button)
+
+    def on_draw(self):
+        self.clear()
+        self.manager.draw()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        pass
+
+    def start_game(self, event):
+        game_view = SnowRacerGame()
+        game_view.setup()
+        self.window.show_view(game_view)
 
 def teleport_sprites(*args):
     for sprite in args:
         sprite.center_y += SCALE * TILE_WIDTH * 144
 
 def main():
-    game = SnowRacerGame()
-    game.setup()
+    arcade.load_font('font.ttf')
+    window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    window.show_view(StartWindow())
     arcade.run()
-
 
 if __name__ == "__main__":
     main()
