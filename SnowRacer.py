@@ -84,6 +84,8 @@ class Monster(arcade.Sprite):
         self.center_x += dx
         self.center_y += dy
 
+        self.center_y = min(self.center_y, self.prey.center_y + TILE_WIDTH * SCALE * 8)
+
 
 class SnowRacerGame(arcade.Window):
     def __init__(self):
@@ -109,6 +111,7 @@ class SnowRacerGame(arcade.Window):
         self.tramplins = self.tile_map.sprite_lists['tramplins']
         self.nets = self.tile_map.sprite_lists['nets']
         self.barriers = self.tile_map.sprite_lists['barriers']
+        self.lap_list = self.tile_map.sprite_lists['laps']
         self.collision_list = self.tile_map.sprite_lists["collision"]
 
         self.world_width = int(self.tile_map.width * self.tile_map.tile_width * SCALE)
@@ -149,7 +152,12 @@ class SnowRacerGame(arcade.Window):
             self.racer_list.update(delta_time, 0, self.keys_pressed, speed=f'/1.5')
         else:
             self.racer_list.update(delta_time, boost, self.keys_pressed)
+
         self.monster.update(delta_time)
+
+        collision_with_monster = arcade.check_for_collision(self.racer, self.monster)
+        if collision_with_monster:
+            exit()
 
         self.physics_engine.update()
 
@@ -189,10 +197,11 @@ class SnowRacerGame(arcade.Window):
         self.shadow_list.draw()
         self.tramplins.draw()
         self.nets.draw()
+        self.barriers.draw()
+        self.nature_list.draw()
         self.monster_list.draw()
         self.racer_list.draw()
-        self.nature_list.draw()
-        self.barriers.draw()
+        self.lap_list.draw()
 
         #self.collision_list.draw()
 
