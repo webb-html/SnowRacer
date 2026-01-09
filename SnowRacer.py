@@ -10,18 +10,14 @@ SCREEN_WIDTH = 16 * TILE_WIDTH * SCALE
 SCREEN_HEIGHT = 20 * TILE_WIDTH * SCALE
 SCREEN_TITLE = 'Snow Racer'
 
-RACER_SPEED = 50
-
-MONSTER_SPEED = 100
-
 CAMERA_LERP = 1
 CAMERA_DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
 
 class Racer(arcade.Sprite):
-    def __init__(self, position_x, position_y):
+    def __init__(self, position_x, position_y, start_speed):
         super().__init__()
         self.scale = SCALE
-        self.speed_y = RACER_SPEED
+        self.speed_y = start_speed
         self.speed_x = 200
 
         self.slow_texture = arcade.load_texture("images/character/character_slow.png")
@@ -66,10 +62,10 @@ class Racer(arcade.Sprite):
 
 
 class Monster(arcade.Sprite):
-    def __init__(self,position_x, position_y, prey):
+    def __init__(self,position_x, position_y, prey, speed, distance_to_boost):
         super().__init__()
         self.scale = SCALE
-        self.speed = MONSTER_SPEED
+        self.speed = speed
 
         self.run_textures = []
         self.run_textures.append(arcade.load_texture("images/monster/monster_run_1.png"))
@@ -81,6 +77,8 @@ class Monster(arcade.Sprite):
         self.center_y = position_y
 
         self.prey = prey
+
+        self.distance_to_boost = distance_to_boost
 
         self.current_texture = 0
         self.texture_change_time = 0
@@ -104,7 +102,7 @@ class Monster(arcade.Sprite):
         self.center_x += dx
         self.center_y += dy
 
-        self.center_y = min(self.center_y, self.prey.center_y + TILE_WIDTH * SCALE * 8)
+        self.center_y = min(self.center_y, self.prey.center_y + TILE_WIDTH * SCALE * self.distance_to_boost)
 
     def update_animation(self, delta_time: float = 1/60):
         if self.is_running:
@@ -120,7 +118,7 @@ class Monster(arcade.Sprite):
 
 
 class SnowRacerGame(arcade.View):
-    def __init__(self):
+    def __init__(self, difficulty='medium'):
         super().__init__()
 
         self.world_camera = arcade.camera.Camera2D()  # Камера для игрового мира
@@ -133,6 +131,10 @@ class SnowRacerGame(arcade.View):
 
         self.monster_list = arcade.SpriteList()
         self.monster: arcade.Sprite | None = None
+
+        self.difficulty = difficulty
+
+        self.setup()
 
     def setup(self):
 
@@ -149,10 +151,26 @@ class SnowRacerGame(arcade.View):
         self.world_width = int(self.tile_map.width * self.tile_map.tile_width * SCALE)
         self.world_height = int(self.tile_map.height * self.tile_map.tile_height * SCALE)
 
-        self.racer = Racer(SCALE * TILE_WIDTH * 25, SCALE * TILE_WIDTH * 158)
+        if self.difficulty == 'easy':
+            raser_start_speed = 150
+            self.boost = 1
+            monster_speed = 100
+            monster_distance_to_boost = 8
+        elif self.difficulty == 'hard':
+            raser_start_speed = 155
+            self.boost = 0.25
+            monster_speed = 175
+            monster_distance_to_boost = 4
+        else:
+            raser_start_speed = 100
+            self.boost = 0.5
+            monster_speed = 150
+            monster_distance_to_boost = 6
+
+        self.racer = Racer(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 158, raser_start_speed)
         self.racer_list.append(self.racer)
 
-        self.monster = Monster(SCALE * TILE_WIDTH * 25, SCALE * TILE_WIDTH * 169, self.racer)
+        self.monster = Monster(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 169, self.racer, monster_speed, monster_distance_to_boost)
         self.monster_list.append(self.monster)
 
         self.keys_pressed = set()
@@ -192,7 +210,7 @@ class SnowRacerGame(arcade.View):
 
         collision_with_monster = arcade.check_for_collision(self.racer, self.monster)
         if collision_with_monster:
-            exit()
+            self.window.show_view(GameOverView())
 
         self.physics_engine.update()
 
@@ -241,7 +259,7 @@ class SnowRacerGame(arcade.View):
         self.gui_camera.use()
 
 
-class MainWindow(arcade.View):
+class MainView(arcade.View):
     def __init__(self):
         super().__init__()
         arcade.set_background_color((183,210,235, 255))
@@ -263,14 +281,14 @@ class MainWindow(arcade.View):
 
         button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
                         'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
-                        'press': UITextureButtonStyle(font_size=12, font_name=('Karmatic Arcade', 'arial', 'calibri'),
+                        'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
                                                       font_color=(200, 200, 200, 255))}
 
         input_name = UIInputText(width=200, height=30, text="input name", font_name='Karmatic Arcade', font_size=15)
         self.box_layout.add(input_name)
 
         start_button = UIFlatButton(text='Start game', width=200, height=50, style=button_style)
-        start_button.on_click = self.start_game
+        start_button.on_click = self.select_diffculty
         self.box_layout.add(start_button)
 
         score_button = UIFlatButton(text='Score table', width=200, height=50, style=button_style)
@@ -287,10 +305,101 @@ class MainWindow(arcade.View):
     def on_mouse_press(self, x, y, button, modifiers):
         pass
 
-    def start_game(self, event):
+    def select_diffculty(self, event):
+        select_difficulty = SelectDifficultyView()
+        self.window.show_view(select_difficulty)
+        '''
         game_view = SnowRacerGame()
         game_view.setup()
         self.window.show_view(game_view)
+        '''
+
+
+class SelectDifficultyView(arcade.View):
+    def __init__(self):
+        super().__init__()
+        arcade.set_background_color((183, 210, 235, 255))
+
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+        self.box_layout = UIBoxLayout(vertical=False, space_between=10)
+
+        self.setup_widgets()
+
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
+
+    def setup_widgets(self):
+        button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
+                                                      font_color=(200, 200, 200, 255))}
+
+        easy_difficulty_button = UIFlatButton(text='Easy', width=100, height=100, style=button_style)
+        easy_difficulty_button.on_click = self.start_easy_game
+        self.box_layout.add(easy_difficulty_button)
+
+        medium_difficulty_button = UIFlatButton(text='Medium', width=100, height=100, style=button_style)
+        medium_difficulty_button.on_click = self.start_medium_game
+        self.box_layout.add(medium_difficulty_button)
+
+        hard_difficulty_button = UIFlatButton(text='Hard', width=100, height=100, style=button_style)
+        hard_difficulty_button.on_click = self.start_hard_game
+        self.box_layout.add(hard_difficulty_button)
+
+    def on_draw(self):
+        self.clear()
+        self.manager.draw()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        pass
+
+    def start_easy_game(self, event):
+        self.window.show_view(SnowRacerGame(difficulty='easy'))
+
+    def start_medium_game(self, event):
+        self.window.show_view(SnowRacerGame())
+
+    def start_hard_game(self, event):
+        self.window.show_view(SnowRacerGame(difficulty='hard'))
+
+
+class GameOverView(arcade.View):
+    def __init__(self):
+        super().__init__()
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+        self.box_layout = UIBoxLayout(vertical=True, space_between=10)
+
+        self.setup_widgets()
+
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
+
+    def setup_widgets(self):
+        button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
+                                                      font_color=(200, 200, 200, 255))}
+
+        lose_text = UILabel("Game Over", font_size=30, font_name='Karmatic Arcade')
+        self.box_layout.add(lose_text)
+
+        to_menu_button = UIFlatButton(text='Back to main menu', width=250, height=50, style=button_style)
+        to_menu_button.on_click = self.to_main_menu
+        self.box_layout.add(to_menu_button)
+
+    def on_draw(self):
+        self.clear()
+        self.manager.draw()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        pass
+
+    def to_main_menu(self, event):
+        self.window.show_view(MainView())
 
 def teleport_sprites(*args):
     for sprite in args:
@@ -299,7 +408,7 @@ def teleport_sprites(*args):
 def main():
     arcade.load_font('font.ttf')
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    window.show_view(MainWindow())
+    window.show_view(MainView())
     arcade.run()
 
 if __name__ == "__main__":
