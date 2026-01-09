@@ -1,6 +1,7 @@
 import arcade
 from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
+from pyglet import window
 
 from pyglet.graphics import Batch
 
@@ -125,7 +126,7 @@ class Monster(arcade.Sprite):
 
 
 class SnowRacerGame(arcade.View):
-    def __init__(self, difficulty='medium'):
+    def __init__(self, name, difficulty='medium'):
         super().__init__()
 
         self.world_camera = arcade.camera.Camera2D()  # Камера для игрового мира
@@ -140,6 +141,7 @@ class SnowRacerGame(arcade.View):
         self.monster: arcade.Sprite | None = None
 
         self.difficulty = difficulty
+        self.name = name
 
         self.setup()
 
@@ -229,7 +231,7 @@ class SnowRacerGame(arcade.View):
 
         collision_with_monster = arcade.check_for_collision(self.racer, self.monster)
         if collision_with_monster:
-            self.window.show_view(GameOverView())
+            self.window.show_view(GameOverView(str(round(self.racer.score)), self.name))
 
         self.physics_engine.update()
 
@@ -284,6 +286,8 @@ class MainView(arcade.View):
         super().__init__()
         arcade.set_background_color((183,210,235, 255))
 
+        self.name = 'Incognito'
+
         self.manager = UIManager()
         self.manager.enable()
         self.anchor_layout = UIAnchorLayout()
@@ -305,6 +309,7 @@ class MainView(arcade.View):
                                                       font_color=(200, 200, 200, 255))}
 
         input_name = UIInputText(width=200, height=30, text="input name", font_name='Karmatic Arcade', font_size=15)
+        input_name.on_change = self.write_name
         self.box_layout.add(input_name)
 
         start_button = UIFlatButton(text='Start game', width=200, height=50, style=button_style)
@@ -326,17 +331,16 @@ class MainView(arcade.View):
         pass
 
     def select_diffculty(self, event):
-        select_difficulty = SelectDifficultyView()
+        select_difficulty = SelectDifficultyView(self.name)
         self.window.show_view(select_difficulty)
-        '''
-        game_view = SnowRacerGame()
-        game_view.setup()
-        self.window.show_view(game_view)
-        '''
+
+    def write_name(self, text):
+        if text != 'input name':
+            self.name= text.new_value.strip()
 
 
 class SelectDifficultyView(arcade.View):
-    def __init__(self):
+    def __init__(self, name):
         super().__init__()
         arcade.set_background_color((183, 210, 235, 255))
 
@@ -349,6 +353,8 @@ class SelectDifficultyView(arcade.View):
 
         self.anchor_layout.add(self.box_layout)
         self.manager.add(self.anchor_layout)
+
+        self.name = name
 
     def setup_widgets(self):
         button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
@@ -376,18 +382,22 @@ class SelectDifficultyView(arcade.View):
         pass
 
     def start_easy_game(self, event):
-        self.window.show_view(SnowRacerGame(difficulty='easy'))
+        self.window.show_view(SnowRacerGame(self.name, difficulty='easy'))
 
     def start_medium_game(self, event):
-        self.window.show_view(SnowRacerGame())
+        self.window.show_view(SnowRacerGame(self.name))
 
     def start_hard_game(self, event):
-        self.window.show_view(SnowRacerGame(difficulty='hard'))
+        self.window.show_view(SnowRacerGame(self.name, difficulty='hard'))
 
 
 class GameOverView(arcade.View):
-    def __init__(self):
+    def __init__(self, score, name):
         super().__init__()
+
+        self.score = score
+        write_schore(score, name)
+
         self.manager = UIManager()
         self.manager.enable()
         self.anchor_layout = UIAnchorLayout()
@@ -407,6 +417,9 @@ class GameOverView(arcade.View):
         lose_text = UILabel("Game Over", font_size=30, font_name='Karmatic Arcade')
         self.box_layout.add(lose_text)
 
+        score_text = UILabel(f"Score: {self.score}", font_size=15, font_name='Karmatic Arcade')
+        self.box_layout.add(score_text)
+
         to_menu_button = UIFlatButton(text='Back to main menu', width=250, height=50, style=button_style)
         to_menu_button.on_click = self.to_main_menu
         self.box_layout.add(to_menu_button)
@@ -420,6 +433,14 @@ class GameOverView(arcade.View):
 
     def to_main_menu(self, event):
         self.window.show_view(MainView())
+
+def write_schore(score, name):
+    with open('schore_table.txt', 'r', encoding='utf-8') as file:
+        score_list = file.readlines()
+    score_list.append(f'{name} - {score}\n')
+    score_list.sort(reverse=True, key=lambda x: int(x.split()[-1]))
+    with open('schore_table.txt', 'w', encoding='utf-8') as file:
+        file.writelines(score_list)
 
 def teleport_sprites(*args):
     for sprite in args:
