@@ -2,6 +2,8 @@ import arcade
 from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 
+from pyglet.graphics import Batch
+
 SCALE = 1.5
 
 TILE_WIDTH = 16
@@ -14,7 +16,7 @@ CAMERA_LERP = 1
 CAMERA_DEAD_ZONE_W = int(SCREEN_WIDTH * 0.25)
 
 class Racer(arcade.Sprite):
-    def __init__(self, position_x, position_y, start_speed):
+    def __init__(self, position_x, position_y, start_speed, schore_modificator):
         super().__init__()
         self.scale = SCALE
         self.speed_y = start_speed
@@ -26,6 +28,9 @@ class Racer(arcade.Sprite):
 
         self.center_x = position_x
         self.center_y = position_y
+
+        self.score = 0
+        self.score_modificator = schore_modificator
 
     def update(self,delta_time, boost, keys_pressed, **kwargs):
         if kwargs:
@@ -53,6 +58,8 @@ class Racer(arcade.Sprite):
         self.center_x += dx
         self.center_y += dy
         self.speed_y += boost
+
+        self.score +=0.001 * self.speed_y * self.score_modificator
 
     def update_texture(self):
         if self.speed_y > 200:
@@ -136,6 +143,8 @@ class SnowRacerGame(arcade.View):
 
         self.setup()
 
+        self.keys_pressed = set()
+
     def setup(self):
 
         self.tile_map = arcade.load_tilemap('trace.tmx', scaling=SCALE)
@@ -156,24 +165,30 @@ class SnowRacerGame(arcade.View):
             self.boost = 1
             monster_speed = 100
             monster_distance_to_boost = 8
+            score_modificator = 0.5
         elif self.difficulty == 'hard':
             raser_start_speed = 155
             self.boost = 0.25
             monster_speed = 175
             monster_distance_to_boost = 4
+            score_modificator = 1
         else:
             raser_start_speed = 100
             self.boost = 0.5
             monster_speed = 150
             monster_distance_to_boost = 6
+            score_modificator = 1.5
 
-        self.racer = Racer(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 158, raser_start_speed)
+        self.racer = Racer(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 158, raser_start_speed, score_modificator)
         self.racer_list.append(self.racer)
 
-        self.monster = Monster(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 169, self.racer, monster_speed, monster_distance_to_boost)
+        self.monster = Monster(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 169, self.racer, monster_speed,
+                               monster_distance_to_boost)
         self.monster_list.append(self.monster)
 
-        self.keys_pressed = set()
+        self.batch = Batch()
+        self.score = arcade.Text('0', 20, SCREEN_HEIGHT - 34, arcade.color.BLACK, 14,
+                             font_name='Karmatic Arcade', batch=self.batch)
 
         self.physics_engine = arcade.PhysicsEngineSimple(
         self.racer, self.collision_list)
@@ -204,6 +219,10 @@ class SnowRacerGame(arcade.View):
             self.racer_list.update(delta_time, boost, self.keys_pressed)
 
         self.racer.update_texture()
+
+        self.score = arcade.Text(str(round(self.racer.score)), 20, SCREEN_HEIGHT - 34, arcade.color.BLACK, 14,
+                                 font_name='Karmatic Arcade', batch=self.batch)
+
 
         self.monster.update(delta_time)
         self.monster.update_animation()
@@ -257,6 +276,7 @@ class SnowRacerGame(arcade.View):
         self.lap_list.draw()
 
         self.gui_camera.use()
+        self.batch.draw()
 
 
 class MainView(arcade.View):
