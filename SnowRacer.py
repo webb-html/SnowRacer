@@ -1,5 +1,5 @@
 import arcade
-from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle
+from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 
 SCALE = 1.5
@@ -240,7 +240,8 @@ class SnowRacerGame(arcade.View):
 
         self.gui_camera.use()
 
-class StartWindow(arcade.View):
+
+class MainWindow(arcade.View):
     def __init__(self):
         super().__init__()
         arcade.set_background_color((183,210,235, 255))
@@ -265,10 +266,19 @@ class StartWindow(arcade.View):
                         'press': UITextureButtonStyle(font_size=12, font_name=('Karmatic Arcade', 'arial', 'calibri'),
                                                       font_color=(200, 200, 200, 255))}
 
-        start_button = UIFlatButton(text='Start game', font_name='Karmatic Arcade',
-                                        width=200, height=50, style=button_style)
+        input_name = UIInputText(width=200, height=30, text="input name", font_name='Karmatic Arcade', font_size=15)
+        self.box_layout.add(input_name)
+
+        start_button = UIFlatButton(text='Start game', width=200, height=50, style=button_style)
         start_button.on_click = self.start_game
         self.box_layout.add(start_button)
+
+        score_button = UIFlatButton(text='Score table', width=200, height=50, style=button_style)
+        self.box_layout.add(score_button)
+
+        exit_button = UIFlatButton(text='Exit', width=200, height=50, style=button_style)
+        exit_button.on_click = lambda event: arcade.exit()
+        self.box_layout.add(exit_button)
 
     def on_draw(self):
         self.clear()
@@ -289,7 +299,7 @@ def teleport_sprites(*args):
 def main():
     arcade.load_font('font.ttf')
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    window.show_view(StartWindow())
+    window.show_view(MainWindow())
     arcade.run()
 
 if __name__ == "__main__":
