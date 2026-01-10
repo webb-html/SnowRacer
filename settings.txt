@@ -1,2 +1,2 @@
 playing True
-volume 1.0
+volume 0.3

@@ -1,8 +1,10 @@
-from random import sample
+from random import sample, uniform, choice
 
 import arcade
 from arcade.gui import UIManager, UIFlatButton, UILabel, UITextureButtonStyle, UIInputText, UITextArea, UISlider
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
+from arcade.math import rand_in_circle, rand_on_circle
+from arcade.particles import Emitter, FadeParticle, EmitMaintainCount
 
 from pyglet.graphics import Batch
 
@@ -24,7 +26,7 @@ class Racer(arcade.Sprite):
         self.speed_y = start_speed
         self.speed_x = 200
 
-        self.slow_texture = arcade.load_texture("images/character/character_slow.png")
+        self.slow_texture = arcade.load_texture('images/character/character_slow.png')
         self.fast_texture = arcade.load_texture('images/character/character_fast.png')
         self.texture = self.slow_texture
 
@@ -69,7 +71,6 @@ class Racer(arcade.Sprite):
         else:
             self.texture = self.slow_texture
 
-
 class Monster(arcade.Sprite):
     def __init__(self,position_x, position_y, prey, speed, distance_to_boost):
         super().__init__()
@@ -77,8 +78,8 @@ class Monster(arcade.Sprite):
         self.speed = speed
 
         self.run_textures = []
-        self.run_textures.append(arcade.load_texture("images/monster/monster_run_1.png"))
-        self.run_textures.append(arcade.load_texture("images/monster/monster_run_2.png"))
+        self.run_textures.append(arcade.load_texture('images/monster/monster_run_1.png'))
+        self.run_textures.append(arcade.load_texture('images/monster/monster_run_2.png'))
         self.attack_texture = arcade.load_texture('images/monster/monster_attack.png')
         self.texture = self.run_textures[0]
 
@@ -130,13 +131,15 @@ class SnowRacerGame(arcade.View):
     def __init__(self, name, media_player=None ,difficulty='medium'):
         super().__init__()
 
-        self.world_camera = arcade.camera.Camera2D()  # Камера для игрового мира
+        self.world_camera = arcade.camera.Camera2D()
         self.gui_camera = arcade.camera.Camera2D()
 
         self.tile_map = None
 
         self.racer_list = arcade.SpriteList()
         self.racer: arcade.Sprite | None = None
+
+        self.emitters = []
 
         self.monster_list = arcade.SpriteList()
         self.monster: arcade.Sprite | None = None
@@ -160,32 +163,32 @@ class SnowRacerGame(arcade.View):
         self.nets = self.tile_map.sprite_lists['nets']
         self.barriers = self.tile_map.sprite_lists['barriers']
         self.lap_list = self.tile_map.sprite_lists['laps']
-        self.collision_list = self.tile_map.sprite_lists["collision"]
+        self.collision_list = self.tile_map.sprite_lists['collision']
 
         self.world_width = int(self.tile_map.width * self.tile_map.tile_width * SCALE)
         self.world_height = int(self.tile_map.height * self.tile_map.tile_height * SCALE)
 
         if self.difficulty == 'easy':
             raser_start_speed = 150
-            self.boost = 1
             monster_speed = 100
             monster_distance_to_boost = 8
             score_modificator = 0.5
         elif self.difficulty == 'hard':
             raser_start_speed = 155
-            self.boost = 0.25
             monster_speed = 175
             monster_distance_to_boost = 4
             score_modificator = 1
         else:
             raser_start_speed = 100
-            self.boost = 0.5
             monster_speed = 150
             monster_distance_to_boost = 6
             score_modificator = 1.5
 
         self.racer = Racer(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 158, raser_start_speed, score_modificator)
         self.racer_list.append(self.racer)
+
+        self.snow_trail = make_trail(self.racer)
+        self.emitters.append(self.snow_trail)
 
         self.monster = Monster(SCALE * TILE_WIDTH * 23, SCALE * TILE_WIDTH * 169, self.racer, monster_speed,
                                monster_distance_to_boost)
@@ -224,6 +227,27 @@ class SnowRacerGame(arcade.View):
             self.racer_list.update(delta_time, boost, self.keys_pressed)
 
         self.racer.update_texture()
+
+        if self.snow_trail:
+            self.snow_trail.center_x = self.racer.center_x
+            self.snow_trail.center_y = self.racer.center_y
+
+        if self.racer.speed_y > -1:
+            if not self.snow_trail:
+                self.snow_trail = make_trail(self.racer)
+                self.emitters.append(self.snow_trail)
+        else:
+            if self.snow_trail:
+                self.emitters.remove(self.snow_trail)
+                self.snow_trail = None
+
+
+        emitters_copy = self.emitters.copy()
+        for e in emitters_copy:
+            e.update(delta_time)
+        for e in emitters_copy:
+            if e.can_reap():
+                self.emitters.remove(e)
 
         self.score = arcade.Text(str(round(self.racer.score)), 20, SCREEN_HEIGHT - 34, arcade.color.BLACK,
                                  14, font_name='Karmatic Arcade', batch=self.batch)
@@ -277,12 +301,13 @@ class SnowRacerGame(arcade.View):
         self.barriers.draw()
         self.nature_list.draw()
         self.monster_list.draw()
+        for e in self.emitters:
+            e.draw()
         self.racer_list.draw()
         self.lap_list.draw()
 
         self.gui_camera.use()
         self.batch.draw()
-
 
 class MainView(arcade.View):
     def __init__(self, media_player=None):
@@ -292,6 +317,8 @@ class MainView(arcade.View):
         self.name = 'Incognito'
 
         self.media_player = media_player
+
+        self.button_click_sound = arcade.load_sound('music/button_click.wav')
 
         self.manager = UIManager()
         self.manager.enable()
@@ -313,7 +340,7 @@ class MainView(arcade.View):
                         'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
                                                       font_color=(200, 200, 200, 255))}
 
-        input_name = UIInputText(width=200, height=30, text="input name", font_name='Karmatic Arcade', font_size=15)
+        input_name = UIInputText(width=200, height=30, text='input name', font_name='Karmatic Arcade', font_size=15)
         input_name.on_change = self.write_name
         self.box_layout.add(input_name)
 
@@ -341,18 +368,22 @@ class MainView(arcade.View):
         pass
 
     def select_diffculty(self, event):
+        self.button_click_sound.play()
         select_difficulty = SelectDifficultyView(self.name, self.media_player)
         self.window.show_view(select_difficulty)
 
     def to_score_table(self, event):
+        self.button_click_sound.play()
         score_table = ScoreTableView(media_player=self.media_player)
         self.window.show_view(score_table)
 
     def to_settings(self, event):
+        self.button_click_sound.play()
         settings = SettingsView(media_player=self.media_player)
         self.window.show_view(settings)
 
     def write_name(self, text):
+        self.button_click_sound.play(speed=1.5)
         if text != 'input name':
             self.name= text.new_value.strip()
 
@@ -361,6 +392,8 @@ class SelectDifficultyView(arcade.View):
     def __init__(self, name, media_player=None):
         super().__init__()
         arcade.set_background_color((183, 210, 235, 255))
+
+        self.button_click_sound = arcade.load_sound('music/button_click.wav')
 
         self.manager = UIManager()
         self.manager.enable()
@@ -402,18 +435,23 @@ class SelectDifficultyView(arcade.View):
         pass
 
     def start_easy_game(self, event):
+        self.button_click_sound.play()
         self.window.show_view(SnowRacerGame(self.name, difficulty='easy', media_player=self.media_player))
 
     def start_medium_game(self, event):
+        self.button_click_sound.play()
         self.window.show_view(SnowRacerGame(self.name, media_player=self.media_player))
 
     def start_hard_game(self, event):
+        self.button_click_sound.play()
         self.window.show_view(SnowRacerGame(self.name, difficulty='hard', media_player=self.media_player))
 
 
 class GameOverView(arcade.View):
     def __init__(self, score, name, media_player=None):
         super().__init__()
+
+        self.button_click_sound = arcade.load_sound('music/button_click.wav')
 
         self.score = score
         write_score(score, name)
@@ -436,10 +474,10 @@ class GameOverView(arcade.View):
                         'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
                                                       font_color=(200, 200, 200, 255))}
 
-        lose_text = UILabel("Game Over", font_size=30, font_name='Karmatic Arcade')
+        lose_text = UILabel('Game Over', font_size=30, font_name='Karmatic Arcade')
         self.box_layout.add(lose_text)
 
-        score_text = UILabel(f"Score: {self.score}", font_size=15, font_name='Karmatic Arcade')
+        score_text = UILabel(f'Score: {self.score}', font_size=15, font_name='Karmatic Arcade')
         self.box_layout.add(score_text)
 
         to_menu_button = UIFlatButton(text='Back to main menu', width=250, height=50, style=button_style)
@@ -454,12 +492,15 @@ class GameOverView(arcade.View):
         pass
 
     def to_main_menu(self, event):
+        self.button_click_sound.play()
         self.window.show_view(MainView(media_player=self.media_player))
 
 
 class ScoreTableView(arcade.View):
     def __init__(self, media_player=None):
         super().__init__()
+
+        self.button_click_sound = arcade.load_sound('music/button_click.wav')
 
         self.media_player = media_player
 
@@ -498,12 +539,15 @@ class ScoreTableView(arcade.View):
         pass
 
     def to_main_menu(self, event):
+        self.button_click_sound.play()
         self.window.show_view(MainView(media_player=self.media_player))
 
 
 class SettingsView(arcade.View):
     def __init__(self, media_player=None):
         super().__init__()
+
+        self.button_click_sound = arcade.load_sound('music/button_click.wav')
 
         self.media_player: None | MediaPlayer = media_player
 
@@ -574,6 +618,7 @@ class SettingsView(arcade.View):
         pass
 
     def switch_music(self, event):
+        self.button_click_sound.play()
         if self.media_player.player:
             self.media_player.stop()
             write_settings('False', self.media_player.volume)
@@ -589,16 +634,21 @@ class SettingsView(arcade.View):
             write_settings('False', self.media_player.volume)
 
     def set_first_track(self, event):
+        self.button_click_sound.play()
         self.media_player.change_track(track='music/Abnormal Circumstances.mp3')
 
     def set_second_track(self, event):
+        self.button_click_sound.play()
         self.media_player.change_track(track='music/Chase Scene.mp3')
 
     def set_third_track(self, event):
+        self.button_click_sound.play()
         self.media_player.change_track(track='music/Steer Clear.mp3')
 
     def to_main_menu(self, event):
+        self.button_click_sound.play()
         self.window.show_view(MainView(media_player=self.media_player))
+
 
 class MediaPlayer:
     def __init__(self, track='', volume=1.0, file=None):
@@ -662,6 +712,21 @@ def write_settings(is_playng, volume):
 def teleport_sprites(*args):
     for sprite in args:
         sprite.center_y += SCALE * TILE_WIDTH * 144
+
+def make_trail(attached_sprite, maintain=100):
+    snow_texture = [arcade.make_soft_circle_texture(20, arcade.color.WHITE, 255, 80)]
+    emit = Emitter(
+        center_xy=(attached_sprite.center_x, attached_sprite.center_y),
+        emit_controller=EmitMaintainCount(maintain),
+        particle_factory=lambda e: FadeParticle(
+            filename_or_texture=choice(snow_texture),
+            change_xy=rand_in_circle((0.0, 0.0), attached_sprite.speed_y * 0.005),
+            lifetime=uniform(0.002 * attached_sprite.speed_y , 0.006 * attached_sprite.speed_y),
+            start_alpha=200, end_alpha=0,
+            scale=uniform(0.2, 0.3),
+        ),
+    )
+    return emit
 
 def main():
     arcade.load_font('font.ttf')
