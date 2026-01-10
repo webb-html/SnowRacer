@@ -1,7 +1,8 @@
+from random import sample
+
 import arcade
-from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText
+from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText, UITextArea
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
-from pyglet import window
 
 from pyglet.graphics import Batch
 
@@ -222,8 +223,8 @@ class SnowRacerGame(arcade.View):
 
         self.racer.update_texture()
 
-        self.score = arcade.Text(str(round(self.racer.score)), 20, SCREEN_HEIGHT - 34, arcade.color.BLACK, 14,
-                                 font_name='Karmatic Arcade', batch=self.batch)
+        self.score = arcade.Text(str(round(self.racer.score)), 20, SCREEN_HEIGHT - 34, arcade.color.BLACK,
+                                 14, font_name='Karmatic Arcade', batch=self.batch)
 
 
         self.monster.update(delta_time)
@@ -317,6 +318,7 @@ class MainView(arcade.View):
         self.box_layout.add(start_button)
 
         score_button = UIFlatButton(text='Score table', width=200, height=50, style=button_style)
+        score_button.on_click = self.to_score_table
         self.box_layout.add(score_button)
 
         exit_button = UIFlatButton(text='Exit', width=200, height=50, style=button_style)
@@ -333,6 +335,10 @@ class MainView(arcade.View):
     def select_diffculty(self, event):
         select_difficulty = SelectDifficultyView(self.name)
         self.window.show_view(select_difficulty)
+
+    def to_score_table(self, event):
+        score_table = ScoreTableView()
+        self.window.show_view(score_table)
 
     def write_name(self, text):
         if text != 'input name':
@@ -396,7 +402,7 @@ class GameOverView(arcade.View):
         super().__init__()
 
         self.score = score
-        write_schore(score, name)
+        write_score(score, name)
 
         self.manager = UIManager()
         self.manager.enable()
@@ -434,13 +440,94 @@ class GameOverView(arcade.View):
     def to_main_menu(self, event):
         self.window.show_view(MainView())
 
-def write_schore(score, name):
-    with open('schore_table.txt', 'r', encoding='utf-8') as file:
+
+class ScoreTableView(arcade.View):
+    def __init__(self):
+        super().__init__()
+
+        with open('score_table.txt', 'r', encoding='utf-8') as file:
+            self.scores = file.readlines()
+
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+        self.box_layout = UIBoxLayout(vertical=True, space_between=10)
+
+        self.setup_widgets()
+
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
+
+    def setup_widgets(self):
+        button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
+                                                      font_color=(200, 200, 200, 255))}
+
+        text_area = UITextArea(text=''.join(self.scores), width=350, height=300, font_size=16,
+                               font_name='Karmatic Arcade')
+        self.box_layout.add(text_area)
+
+        to_menu_button = UIFlatButton(text='Back to main menu', width=250, height=50, style=button_style)
+        to_menu_button.on_click = self.to_main_menu
+        self.box_layout.add(to_menu_button)
+
+    def on_draw(self):
+        self.clear()
+        self.manager.draw()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        pass
+
+    def to_main_menu(self, event):
+        self.window.show_view(MainView())
+def write_score(score, name):
+    with open('score_table.txt', 'r', encoding='utf-8') as file:
         score_list = file.readlines()
     score_list.append(f'{name} - {score}\n')
     score_list.sort(reverse=True, key=lambda x: int(x.split()[-1]))
-    with open('schore_table.txt', 'w', encoding='utf-8') as file:
+    with open('score_table.txt', 'w', encoding='utf-8') as file:
         file.writelines(score_list)
+
+class MediaPlayer:
+    def __init__(self, track='', volume=1.0):
+        self.track = track
+        self.track_list = []
+
+        self.volume = volume
+
+        self.player: arcade.Sound | None = None
+
+        self.track_list.append(arcade.load_sound('musik/Abnormal Circumstances.mp3'))
+        self.track_list.append(arcade.load_sound('musik/Chase Scene.mp3'))
+        self.track_list.append(arcade.load_sound('musik/Steer Clear.mp3'))
+
+    def run(self):
+        print(1)
+        if self.track:
+            self.player = arcade.play_sound(arcade.load_sound(self.track), volume=self.volume)
+            self.track = ''
+        else:
+            self.player = arcade.play_sound(sample(self.track_list, 1)[0])
+        self.player.push_handlers(on_eos=self.run)
+
+    def change_volume(self, volume):
+        try:
+            self.player.volume = volume
+        except AttributeError:
+            pass
+
+    def stop(self):
+        try:
+            arcade.stop_sound(self.player)
+            self.player = None
+        except TypeError:
+            pass
+
+    def change_track(self, track=''):
+        self.stop()
+        self.track = track
+        self.run()
 
 def teleport_sprites(*args):
     for sprite in args:
@@ -448,8 +535,13 @@ def teleport_sprites(*args):
 
 def main():
     arcade.load_font('font.ttf')
+    media_player = MediaPlayer()
+
+    media_player.run()
+
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
     window.show_view(MainView())
+
     arcade.run()
 
 if __name__ == "__main__":
