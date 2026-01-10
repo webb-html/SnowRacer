@@ -1,0 +1,2 @@
+playing True
+volume 1.0
