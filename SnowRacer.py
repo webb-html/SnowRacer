@@ -1,7 +1,7 @@
 from random import sample
 
 import arcade
-from arcade.gui import UIManager, UIFlatButton, UILabel,UITextureButtonStyle, UIInputText, UITextArea
+from arcade.gui import UIManager, UIFlatButton, UILabel, UITextureButtonStyle, UIInputText, UITextArea, UISlider
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 
 from pyglet.graphics import Batch
@@ -127,7 +127,7 @@ class Monster(arcade.Sprite):
 
 
 class SnowRacerGame(arcade.View):
-    def __init__(self, name, difficulty='medium'):
+    def __init__(self, name, media_player=None ,difficulty='medium'):
         super().__init__()
 
         self.world_camera = arcade.camera.Camera2D()  # Камера для игрового мира
@@ -143,6 +143,8 @@ class SnowRacerGame(arcade.View):
 
         self.difficulty = difficulty
         self.name = name
+
+        self.media_player = media_player
 
         self.setup()
 
@@ -232,7 +234,7 @@ class SnowRacerGame(arcade.View):
 
         collision_with_monster = arcade.check_for_collision(self.racer, self.monster)
         if collision_with_monster:
-            self.window.show_view(GameOverView(str(round(self.racer.score)), self.name))
+            self.window.show_view(GameOverView(str(round(self.racer.score)), self.name, media_player=self.media_player))
 
         self.physics_engine.update()
 
@@ -283,11 +285,13 @@ class SnowRacerGame(arcade.View):
 
 
 class MainView(arcade.View):
-    def __init__(self):
+    def __init__(self, media_player=None):
         super().__init__()
         arcade.set_background_color((183,210,235, 255))
 
         self.name = 'Incognito'
+
+        self.media_player = media_player
 
         self.manager = UIManager()
         self.manager.enable()
@@ -321,6 +325,10 @@ class MainView(arcade.View):
         score_button.on_click = self.to_score_table
         self.box_layout.add(score_button)
 
+        settings_button = UIFlatButton(text='Settings', width=200, height=50, style=button_style)
+        settings_button.on_click = self.to_settings
+        self.box_layout.add(settings_button)
+
         exit_button = UIFlatButton(text='Exit', width=200, height=50, style=button_style)
         exit_button.on_click = lambda event: arcade.exit()
         self.box_layout.add(exit_button)
@@ -333,12 +341,16 @@ class MainView(arcade.View):
         pass
 
     def select_diffculty(self, event):
-        select_difficulty = SelectDifficultyView(self.name)
+        select_difficulty = SelectDifficultyView(self.name, self.media_player)
         self.window.show_view(select_difficulty)
 
     def to_score_table(self, event):
-        score_table = ScoreTableView()
+        score_table = ScoreTableView(media_player=self.media_player)
         self.window.show_view(score_table)
+
+    def to_settings(self, event):
+        settings = SettingsView(media_player=self.media_player)
+        self.window.show_view(settings)
 
     def write_name(self, text):
         if text != 'input name':
@@ -346,7 +358,7 @@ class MainView(arcade.View):
 
 
 class SelectDifficultyView(arcade.View):
-    def __init__(self, name):
+    def __init__(self, name, media_player=None):
         super().__init__()
         arcade.set_background_color((183, 210, 235, 255))
 
@@ -361,6 +373,8 @@ class SelectDifficultyView(arcade.View):
         self.manager.add(self.anchor_layout)
 
         self.name = name
+        self.media_player = media_player
+
 
     def setup_widgets(self):
         button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
@@ -388,21 +402,23 @@ class SelectDifficultyView(arcade.View):
         pass
 
     def start_easy_game(self, event):
-        self.window.show_view(SnowRacerGame(self.name, difficulty='easy'))
+        self.window.show_view(SnowRacerGame(self.name, difficulty='easy', media_player=self.media_player))
 
     def start_medium_game(self, event):
-        self.window.show_view(SnowRacerGame(self.name))
+        self.window.show_view(SnowRacerGame(self.name, media_player=self.media_player))
 
     def start_hard_game(self, event):
-        self.window.show_view(SnowRacerGame(self.name, difficulty='hard'))
+        self.window.show_view(SnowRacerGame(self.name, difficulty='hard', media_player=self.media_player))
 
 
 class GameOverView(arcade.View):
-    def __init__(self, score, name):
+    def __init__(self, score, name, media_player=None):
         super().__init__()
 
         self.score = score
         write_score(score, name)
+
+        self.media_player = media_player
 
         self.manager = UIManager()
         self.manager.enable()
@@ -438,12 +454,14 @@ class GameOverView(arcade.View):
         pass
 
     def to_main_menu(self, event):
-        self.window.show_view(MainView())
+        self.window.show_view(MainView(media_player=self.media_player))
 
 
 class ScoreTableView(arcade.View):
-    def __init__(self):
+    def __init__(self, media_player=None):
         super().__init__()
+
+        self.media_player = media_player
 
         with open('score_table.txt', 'r', encoding='utf-8') as file:
             self.scores = file.readlines()
@@ -480,30 +498,129 @@ class ScoreTableView(arcade.View):
         pass
 
     def to_main_menu(self, event):
-        self.window.show_view(MainView())
-def write_score(score, name):
-    with open('score_table.txt', 'r', encoding='utf-8') as file:
-        score_list = file.readlines()
-    score_list.append(f'{name} - {score}\n')
-    score_list.sort(reverse=True, key=lambda x: int(x.split()[-1]))
-    with open('score_table.txt', 'w', encoding='utf-8') as file:
-        file.writelines(score_list)
+        self.window.show_view(MainView(media_player=self.media_player))
+
+
+class SettingsView(arcade.View):
+    def __init__(self, media_player=None):
+        super().__init__()
+
+        self.media_player: None | MediaPlayer = media_player
+
+        with open('settings.txt', 'r', encoding='utf-8') as file:
+            self.settings = file.readlines()
+
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout()
+        self.box_layout = UIBoxLayout(vertical=True, space_between=20)
+
+        self.volume_layout = UIBoxLayout(vertical=False, space_between=10)
+
+        self.select_track_layout = UIBoxLayout(vertical=True, space_between=5)
+
+        self.setup_widgets()
+
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
+
+    def setup_widgets(self):
+        button_style = {'hover': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'normal': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade'),
+                        'press': UITextureButtonStyle(font_size=12, font_name='Karmatic Arcade',
+                                                      font_color=(200, 200, 200, 255))}
+        switch_music_button = UIFlatButton(text='switch music', width=300, height=50, style=button_style)
+        switch_music_button.on_click = self.switch_music
+        self.box_layout.add(switch_music_button)
+
+        volume_text = UILabel(text='volume: ', width=100, height=20, font_size=14,
+                               font_name='Karmatic Arcade')
+        self.volume_layout.add(volume_text)
+
+        volume_slider = UISlider(width=200, height=20, min_value=0, max_value=1.0, value=self.media_player.volume,
+                                 step=0.1)
+        volume_slider.on_change = self.set_volume
+        self.volume_layout.add(volume_slider)
+
+        self.box_layout.add(self.volume_layout)
+
+        select_track_text = UILabel(text='select track: ', width=300, height=20, font_size=14,
+                              font_name='Karmatic Arcade')
+        self.select_track_layout.add(select_track_text)
+
+        first_track_button = UIFlatButton(text='Abnormal Circumstances', width=300, height=50, style=button_style)
+        first_track_button.on_click = self.set_first_track
+        self.select_track_layout.add(first_track_button)
+
+        second_track_button = UIFlatButton(text='Chase Scene', width=300, height=50, style=button_style)
+        second_track_button.on_click = self.set_second_track
+        self.select_track_layout.add(second_track_button)
+
+        third_track_button = UIFlatButton(text='Steer Clear', width=300, height=50, style=button_style)
+        third_track_button.on_click = self.set_third_track
+        self.select_track_layout.add(third_track_button)
+
+        self.box_layout.add(self.select_track_layout)
+
+        to_menu_button = UIFlatButton(text='Back to main menu', width=300, height=50, style=button_style)
+        to_menu_button.on_click = self.to_main_menu
+        self.box_layout.add(to_menu_button)
+
+    def on_draw(self):
+        self.clear()
+        self.manager.draw()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        pass
+
+    def switch_music(self, event):
+        if self.media_player.player:
+            self.media_player.stop()
+            write_settings('False', self.media_player.volume)
+        else:
+            self.media_player.run()
+            write_settings('True', self.media_player.volume)
+
+    def set_volume(self, value):
+        self.media_player.change_volume(float(value.new_value))
+        if self.media_player.player:
+            write_settings('True', self.media_player.volume)
+        else:
+            write_settings('False', self.media_player.volume)
+
+    def set_first_track(self, event):
+        self.media_player.change_track(track='music/Abnormal Circumstances.mp3')
+
+    def set_second_track(self, event):
+        self.media_player.change_track(track='music/Chase Scene.mp3')
+
+    def set_third_track(self, event):
+        self.media_player.change_track(track='music/Steer Clear.mp3')
+
+    def to_main_menu(self, event):
+        self.window.show_view(MainView(media_player=self.media_player))
 
 class MediaPlayer:
-    def __init__(self, track='', volume=1.0):
+    def __init__(self, track='', volume=1.0, file=None):
         self.track = track
         self.track_list = []
 
-        self.volume = volume
-
         self.player: arcade.Sound | None = None
 
-        self.track_list.append(arcade.load_sound('musik/Abnormal Circumstances.mp3'))
-        self.track_list.append(arcade.load_sound('musik/Chase Scene.mp3'))
-        self.track_list.append(arcade.load_sound('musik/Steer Clear.mp3'))
+        self.track_list.append(arcade.load_sound('music/Abnormal Circumstances.mp3'))
+        self.track_list.append(arcade.load_sound('music/Chase Scene.mp3'))
+        self.track_list.append(arcade.load_sound('music/Steer Clear.mp3'))
+
+        if file:
+            with open(file, 'r', encoding='utf-8') as _file:
+                settings = _file.readlines()
+                self.volume = float(settings[-1].split()[-1].strip())
+                if settings[0].split()[-1].strip() == 'True':
+                    self.run()
+        else:
+            self.volume = volume
 
     def run(self):
-        print(1)
         if self.track:
             self.player = arcade.play_sound(arcade.load_sound(self.track), volume=self.volume)
             self.track = ''
@@ -514,6 +631,7 @@ class MediaPlayer:
     def change_volume(self, volume):
         try:
             self.player.volume = volume
+            self.volume = volume
         except AttributeError:
             pass
 
@@ -529,18 +647,29 @@ class MediaPlayer:
         self.track = track
         self.run()
 
+def write_score(score, name):
+    with open('score_table.txt', 'r', encoding='utf-8') as file:
+        score_list = file.readlines()
+    score_list.append(f'{name} - {score}\n')
+    score_list.sort(reverse=True, key=lambda x: int(x.split()[-1]))
+    with open('score_table.txt', 'w', encoding='utf-8') as file:
+        file.writelines(score_list)
+
+def write_settings(is_playng, volume):
+    with open('settings.txt', 'w', encoding='utf-8') as file:
+        file.writelines([f'playing {is_playng}\n', f'volume {volume}'])
+
 def teleport_sprites(*args):
     for sprite in args:
         sprite.center_y += SCALE * TILE_WIDTH * 144
 
 def main():
     arcade.load_font('font.ttf')
-    media_player = MediaPlayer()
 
-    media_player.run()
+    media_player = MediaPlayer(file='settings.txt')
 
     window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    window.show_view(MainView())
+    window.show_view(MainView(media_player=media_player))
 
     arcade.run()
 
